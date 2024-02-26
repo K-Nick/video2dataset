@@ -268,12 +268,13 @@ class DownloadWorker:
                         status_dict.increment(error_message)
                         meta["status"] = status
                         meta["error_message"] = error_message
-                        sample_writer.write(
-                            {},
-                            str_key,
-                            sample_data[caption_indice] if caption_indice is not None else None,
-                            meta,
-                        )
+                        # FIXME: don't put samples with failed downloading
+                        # sample_writer.write(
+                        #     {},
+                        #     str_key,
+                        #     sample_data[caption_indice] if caption_indice is not None else None,
+                        #     meta,
+                        # )
                         semaphore.release()
                     else:
                         traceback.print_exc()

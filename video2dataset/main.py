@@ -1,11 +1,14 @@
 """Create dataset from video links and metadata."""
+
 import os
 import sys
 import signal
 import fire
 import fsspec
+from argparse import ArgumentParser
 
 from omegaconf import OmegaConf
+from kn_util.config import LazyConfig
 from typing import List, Optional, Any
 import numpy as np  # pylint: disable=unused-import
 
@@ -35,72 +38,70 @@ def identity(x):
     return x
 
 
+def get_args():
+
+    parser = ArgumentParser("Create datasets from video/audio links")
+
+    parser.add_argument(
+        "--url_list", required=True, help="List of input URLs in supported input formats (csv, parquet, braceexpand tar paths, etc.)"
+    )
+    parser.add_argument("--output_folder", default="dataset", help="Desired location of output dataset")
+    parser.add_argument(
+        "--output_format", default="files", choices=["files", "webdataset", "parquet", "tfrecord", "dummy"], help="Format of output dataset"
+    )
+    parser.add_argument(
+        "--input_format",
+        default="csv",
+        choices=["txt", "csv", "tsv", "tsv.gz", "json", "parquet", "webdataset"],
+        help="Format of the input",
+    )
+    parser.add_argument(
+        "--encode_formats",
+        type=eval,
+        help='Dict specifying what extension each modality should use, e.g., \'{"video": "mp4", "audio": "m4a"}\'',
+    )
+    parser.add_argument("--stage", default="download", help="Processing stage (download, subset, optical_flow, caption)")
+    parser.add_argument("--url_col", default="url", help="Column in input containing the URL")
+    parser.add_argument("--caption_col", help="Column in input containing captions (to be written as txt)")
+    parser.add_argument("--clip_col", help="Column in input containing timeframes of clips for how to split video")
+    parser.add_argument("--save_additional_columns", nargs="+", help="List of column names to save to json component of a sample")
+    parser.add_argument("--enable_wandb", action="store_true", help="Enable logging info to wandb")
+    parser.add_argument("--wandb_project", default="video2dataset", help="Name of wandb project to log runs to")
+    parser.add_argument("--incremental_mode", default="incremental", choices=["incremental", "overwrite"], help="How to handle restarting")
+    parser.add_argument("--max_shard_retry", type=int, default=1, help="Maximum attempts to retry a failed shard")
+    parser.add_argument("--tmp_dir", default="/tmp", help="Path to temporary directory on your file system")
+    parser.add_argument("--config", default="default", help="Path to your config of choice or the config itself")
+    parser.add_argument("--opts", nargs="+", help="Additional config options to override", default=[])
+
+    return parser.parse_args()
+
+
 # pylint: disable=unused-argument
 # pylint: disable=eval-used
 # pylint: disable=broad-except
-def video2dataset(
-    url_list: str,
-    output_folder: str = "dataset",
-    output_format: str = "files",
-    input_format: str = "csv",
-    encode_formats: Optional[EncodeFormats] = None,
-    stage: str = "download",
-    url_col: str = "url",
-    caption_col: Optional[str] = None,
-    clip_col: Optional[str] = None,
-    save_additional_columns: Optional[List[str]] = None,
-    enable_wandb: bool = False,
-    wandb_project: str = "video2dataset",
-    incremental_mode: str = "incremental",
-    max_shard_retry: int = 1,
-    tmp_dir: str = "/tmp",
-    config: Any = "default",
-):
-    """
-    Create datasets from video/audio links
+def video2dataset(local_args):
 
-    Args:
-    url_list: list of input urls - can be any of the supported input formats
-        (csv, parquet, braceexpand tar paths etc.)
-    output_folder: Desired location of output dataset
-    output_format: Format of output dataset, can be
-        - files, samples saved in subdirectory for each shard (useful for debugging)
-        - webdataset, samples saved in tars (useful for efficient loading)
-        - parquet, sampels saved in parquet (as bytes)
-        - tfrecord, samples saved in tfrecord (as bytes)
-        - dummy, does not save (useful for benchmarks)
-    input_format: Format of the input, can be
-        - txt, text file with a url in each line
-        - csv, csv file with urls, (and captions + metadata)
-        - tsv, tsv - || -
-        - tsv.gz, - || - but compressed gzip
-        - json, loads urls and metadata as json
-        - parquet, loads urls and metadata as parquet
-        - webdataset, usually braceexpand format of mutliple paths to tars to re-process
-    encode_formats: Dict that specifies what extension each modality should use
-        f.e. {"video": "mp4", "audio": "m4a"}
-    stage: String that tells video2dataset what stage of processing is being performed. Can be
-        WARNING: To be depracated soon (this information should be deduced based on config)
-        - download, when input is some tabular format and data must be downloaded first
-        - subset, tar files are already written and we would like to re-process (input_format == "webdataset")
-        - optical_flow, tar files are written and we would like to compute optical_flow and save to md shards
-        - caption, tar files are written and we would like to generate caption and save to md shards
-    url_col: Column in input (if has columns) that contains the url
-    caption_col: Column in input (if has columns) that contains captions (to be written as txt)
-    clip_col: Column in input (if has columns) that contains timeframes of clips for how to split video
-    save_additional_columns: List of column names to save to json component of a sample
-    enable_wandb: Whether or not to log info to wandb
-    wandb_project: Name of wandb project to log runs to
-    incremental_mode: Decides how to handle restarting, Can be
-        - incremental, checks which shards are done and skips those
-        - overwrite, deletes and reprocesses shards as it goes
-    max_shard_retry: Maximum amount of attempts to retry a failed shard
-    tmp_dir: Path to temporary directory on your file system
-    config: Path to your config of choice or the config itself (more info on configs in API doc)
-    """
-    local_args = dict(locals())
+    clip_col = local_args.clip_col
+    caption_col = local_args.caption_col
+    encode_formats = local_args.encode_formats
+    enable_wandb = local_args.enable_wandb
+    incremental_mode = local_args.incremental_mode
+    max_shard_retry = local_args.max_shard_retry
+    output_folder = local_args.output_folder
+    output_format = local_args.output_format
+    save_additional_columns = local_args.save_additional_columns
+    stage = local_args.stage
+    url_col = local_args.url_col
+    url_list = local_args.url_list
+    wandb_project = local_args.wandb_project
+    tmp_dir = local_args.tmp_dir
+    config = local_args.config
+    input_format = local_args.input_format
+    opts = local_args.opts
+
     if isinstance(config, str):
         config = CONFIGS[config] if config in CONFIGS else OmegaConf.load(config)
+        LazyConfig.apply_overrides(config, opts)
         config = OmegaConf.to_container(config)
     for arg_type in ["subsampling", "reading", "storage", "distribution"]:
         assert arg_type in config
@@ -111,10 +112,7 @@ def video2dataset(
     called_from_slurm = "CALLED_FROM_SLURM" in os.environ
     if called_from_slurm:
         global_task_id = int(os.environ["GLOBAL_RANK"])
-        num_tasks = (
-            config["distribution"]["distributor_args"]["n_nodes"]
-            * config["distribution"]["distributor_args"]["tasks_per_node"]
-        )
+        num_tasks = config["distribution"]["distributor_args"]["n_nodes"] * config["distribution"]["distributor_args"]["tasks_per_node"]
         config["reading"]["sampler"] = SlurmShardSampler(global_task_id=global_task_id, num_tasks=num_tasks)
         config["distribution"]["distributor"] = "multiprocessing"
 
@@ -192,9 +190,7 @@ def video2dataset(
         raise ValueError(f"Invalid output format {output_format}")
 
     if input_format == "webdataset":
-        shard_iterator = OutputSharder(  # type: ignore
-            url_list, input_format, done_shards, sampler=config["reading"]["sampler"]
-        )
+        shard_iterator = OutputSharder(url_list, input_format, done_shards, sampler=config["reading"]["sampler"])  # type: ignore
     else:
         shard_iterator = InputSharder(  # type: ignore
             url_list,
@@ -269,6 +265,8 @@ def video2dataset(
         slurm_args = config["distribution"]["distributor_args"]
 
         distributor_fn = SlurmDistributor(worker_args=worker_args, **slurm_args)
+    elif config["distribution"]["distributor"] == "no_distributor":
+        distributor_fn = no_distributor
     else:
         raise ValueError(f"Distributor {config['distribution']['distributor']} not supported")
 
@@ -285,7 +283,8 @@ def video2dataset(
 
 
 def main():
-    fire.Fire(video2dataset)
+    args = get_args()
+    video2dataset(args)
 
 
 if __name__ == "__main__":

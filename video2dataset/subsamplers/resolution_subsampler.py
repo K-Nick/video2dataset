@@ -1,6 +1,7 @@
 """
 resolution subsampler adjusts the resolution of the videos to some constant value
 """
+
 import os
 import ffmpeg
 import tempfile
@@ -40,7 +41,8 @@ class ResolutionSubsampler(Subsampler):
         self.height = height if video_size < 0 else video_size
         self.width = width if video_size < 0 else video_size
         self.video_size = video_size
-        self.encode_format = encode_format
+        # https://github.com/iejMac/video2dataset/issues/311
+        self.encode_formats = {"video": encode_format}
 
     def __call__(self, streams, metadata=None):
         video_bytes = streams["video"]

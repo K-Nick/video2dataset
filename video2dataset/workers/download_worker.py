@@ -23,15 +23,14 @@ from video2dataset.subsamplers import (
     NoOpSubsampler,
     ResolutionSubsampler,
     AudioRateSubsampler,
+    DecordSubsampler,
 )
 
 
 def compute_key(key, shard_id, oom_sample_per_shard, oom_shard_count):
     true_key = (10**oom_sample_per_shard) * shard_id + key
     key_format = oom_sample_per_shard + oom_shard_count
-    str_key = "{true_key:0{key_format}d}".format(  # pylint: disable=consider-using-f-string
-        key_format=key_format, true_key=true_key
-    )
+    str_key = "{true_key:0{key_format}d}".format(key_format=key_format, true_key=true_key)  # pylint: disable=consider-using-f-string
     return str_key
 
 
@@ -66,18 +65,14 @@ class DownloadWorker:
 
         self.ffprobe_subsampler = None
         if "FFProbeSubsampler" in self.config["subsampling"] or need_keyframes:
-            self.ffprobe_subsampler = FFProbeSubsampler(
-                **self.config["subsampling"].get("FFProbeSubsampler", {"args": {}})["args"]
-            )
+            self.ffprobe_subsampler = FFProbeSubsampler(**self.config["subsampling"].get("FFProbeSubsampler", {"args": {}})["args"])
             self.ffprobe_subsampler.extract_keyframes |= need_keyframes
 
         self.cut_detector = None
         self.cuts_are_clips = False
         if "CutDetectionSubsampler" in self.config["subsampling"]:
             if "args" in self.config["subsampling"]["CutDetectionSubsampler"]:
-                self.cut_detector = CutDetectionSubsampler(
-                    **self.config["subsampling"]["CutDetectionSubsampler"]["args"]
-                )
+                self.cut_detector = CutDetectionSubsampler(**self.config["subsampling"]["CutDetectionSubsampler"]["args"])
             self.cuts_are_clips = self.config["subsampling"]["CutDetectionSubsampler"].get("cuts_are_clips", False)
 
         self.noop_subsampler = NoOpSubsampler()
@@ -87,6 +82,9 @@ class DownloadWorker:
             video_subsamplers.append(ResolutionSubsampler(**self.config["subsampling"]["ResolutionSubsampler"]["args"]))
         if "FrameSubsampler" in self.config["subsampling"]:
             video_subsamplers.append(FrameSubsampler(**self.config["subsampling"]["FrameSubsampler"]["args"]))
+
+        if "DecordSubSampler" in self.config["subsampling"]:
+            video_subsamplers.append(DecordSubsampler(**self.config["subsampling"]["DecordSubSampler"]["args"]))
 
         audio_subsamplers: List[Any] = []
         if "AudioRateSubsampler" in self.config["subsampling"]:
@@ -178,9 +176,7 @@ class DownloadWorker:
             ):
                 try:
                     _, sample_data = shard_to_dl[key]
-                    str_key = compute_key(
-                        key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"]
-                    )
+                    str_key = compute_key(key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"])
                     meta = {
                         **{self.column_list[i]: sample_data[i] for i in range(len(self.column_list))},
                         "key": str_key,
@@ -225,11 +221,7 @@ class DownloadWorker:
                     # 1 video -> many videos (either clipping or noop which does identity broadcasting)
                     broadcast_subsampler = (
                         self.clipping_subsampler
-                        if (
-                            "clips" in self.column_list
-                            or self.config["storage"]["captions_are_subtitles"]
-                            or self.cuts_are_clips
-                        )
+                        if ("clips" in self.column_list or self.config["storage"]["captions_are_subtitles"] or self.cuts_are_clips)
                         else self.noop_subsampler
                     )
                     subsampled_streams, metas, error_message = broadcast_subsampler(streams, meta)
@@ -245,9 +237,7 @@ class DownloadWorker:
                     successes += 1
                     status = "success"
                     status_dict.increment(status)
-                    subsampled_streams_list = [
-                        dict(zip(subsampled_streams, s)) for s in zip(*subsampled_streams.values())
-                    ]
+                    subsampled_streams_list = [dict(zip(subsampled_streams, s)) for s in zip(*subsampled_streams.values())]
                     for subsampled_streams, meta in zip(subsampled_streams_list, metas):
                         meta["status"] = status
 

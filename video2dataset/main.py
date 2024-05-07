@@ -269,6 +269,7 @@ def video2dataset(local_args):
         distributor_fn = no_distributor
     else:
         raise ValueError(f"Distributor {config['distribution']['distributor']} not supported")
+    
 
     distributor_fn(
         config["distribution"]["processes_count"],

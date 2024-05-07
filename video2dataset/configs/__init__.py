@@ -10,4 +10,5 @@ CONFIGS = {
     "optical_flow": OmegaConf.load(os.path.join(configs_path, "optical_flow.yaml")),
     "caption": OmegaConf.load(os.path.join(configs_path, "caption.yaml")),
     "custom_downsample": OmegaConf.load(os.path.join(configs_path, "custom_downsample.yaml")),
+    "decord_downsample": OmegaConf.load(os.path.join(configs_path, "decord_downsample.yaml")),
 }

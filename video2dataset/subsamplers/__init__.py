@@ -12,3 +12,4 @@ from .cut_detection_subsampler import CutDetectionSubsampler
 from .optical_flow_subsampler import OpticalFlowSubsampler
 from .whisper_subsampler import WhisperSubsampler
 from .caption_subsampler import CaptionSubsampler
+from .decord_subsampler import DecordSubsampler

@@ -1,8 +1,8 @@
 subsampling:
   DecordSubSampler:
     args:
-      num_frames: 16
-      frame_size: [256, 256]
+      fps: 8
+      frame_size: 256
 
 reading:
   yt_args:

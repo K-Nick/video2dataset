@@ -222,7 +222,7 @@ class YtDlpDownloader:
                 "no_warnings": True,
             }
             if timestamp is not None:
-                ydl_opts["download_sections"] = timestamp
+                ydl_opts["download_sections"] = f"*{timestamp}"
 
             err = None
             try:

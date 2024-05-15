@@ -1,4 +1,5 @@
 """classes and functions for downloading videos"""
+
 import os
 import uuid
 import requests
@@ -179,7 +180,7 @@ class YtDlpDownloader:
         # was relevant with HD videos for loading with decord
         self.specify_codec = False
 
-    def __call__(self, url):
+    def __call__(self, url, timestamp=None):
         modality_paths = {}
 
         video_format_string = (
@@ -187,9 +188,7 @@ class YtDlpDownloader:
             f"w[height>={self.video_size}][ext=mp4]{'[codec=avc1]' if self.specify_codec else ''}/"
             f"bv/b[ext=mp4]{'[codec=avc1]' if self.specify_codec else ''}"
         )
-        audio_fmt_string = (
-            f"wa[asr>={self.audio_rate}][ext=m4a] / ba[ext=m4a]" if self.audio_rate > 0 else "ba[ext=m4a]"
-        )
+        audio_fmt_string = f"wa[asr>={self.audio_rate}][ext=m4a] / ba[ext=m4a]" if self.audio_rate > 0 else "ba[ext=m4a]"
 
         if self.encode_formats.get("audio", None):
             audio_path_m4a = f"{self.tmp_dir}/{str(uuid.uuid4())}.m4a"
@@ -222,6 +221,8 @@ class YtDlpDownloader:
                 "quiet": True,
                 "no_warnings": True,
             }
+            if timestamp is not None:
+                ydl_opts["download_sections"] = timestamp
 
             err = None
             try:
@@ -250,12 +251,15 @@ class YtDlpDownloader:
 class VideoDataReader:
     """Video data reader provide data for a video"""
 
-    def __init__(self, encode_formats, tmp_dir, reading_config):
+    def __init__(self, encode_formats, tmp_dir, reading_config, url_col=None, timestamp_col=None):
         self.webfile_downloader = WebFileDownloader(reading_config["timeout"], tmp_dir, encode_formats)
         self.yt_downloader = YtDlpDownloader(reading_config["yt_args"], tmp_dir, encode_formats)
+        self.url_col = url_col
+        self.timestamp_col = timestamp_col
 
-    def __call__(self, row):
-        key, url = row
+    def __call__(self, inputs):
+        key, row = inputs
+        url = row[self.url_col]
 
         meta_dict = None
         try:
@@ -263,7 +267,10 @@ class VideoDataReader:
             if get_file_info(url):  # web file that can be directly downloaded
                 modality_paths, error_message = self.webfile_downloader(url)
             else:
-                modality_paths, meta_dict, error_message = self.yt_downloader(url)
+                timestamp = None
+                if self.timestamp_col is not None:
+                    timestamp = row[self.timestamp_col]
+                modality_paths, meta_dict, error_message = self.yt_downloader(url, timestamp=timestamp)
         except Exception as e:  # pylint: disable=(broad-except)
             modality_paths, meta_dict, error_message = {}, None, str(e)
 

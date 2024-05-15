@@ -54,7 +54,14 @@ class DownloadWorker:
         self.encode_formats = encode_formats
         self.config = config
 
-        self.data_reader = VideoDataReader(encode_formats, tmp_dir, config["reading"])
+        timestamp_col = "timestamp" if "timestamp" in column_list else None
+        self.data_reader = VideoDataReader(
+            encode_formats,
+            tmp_dir,
+            config["reading"],
+            url_col="url",
+            timestamp_col=timestamp_col,
+        )
 
         self.clipping_subsampler = ClippingSubsampler(
             5,  # oom_clip_count
@@ -140,14 +147,14 @@ class DownloadWorker:
         bytes_downloaded = 0
         url_indice = self.column_list.index("url")
         caption_indice = self.column_list.index("caption") if "caption" in self.column_list else None
-        key_url_list = [(key, x[url_indice]) for key, x in shard_to_dl]
+        # key_url_list = [(key, x[url_indice]) for key, x in shard_to_dl]
 
         semaphore = Semaphore(self.config["distribution"]["thread_count"])
 
         def data_generator():
-            for e in key_url_list:
+            for key, e in shard_to_dl:
                 semaphore.acquire()  # pylint: disable=(consider-using-with)
-                yield e
+                yield key, {col: e[i] for i, col in enumerate(self.column_list)}
 
         loader = data_generator()
 
@@ -176,6 +183,7 @@ class DownloadWorker:
             ):
                 try:
                     _, sample_data = shard_to_dl[key]
+
                     str_key = compute_key(key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"])
                     meta = {
                         **{self.column_list[i]: sample_data[i] for i in range(len(self.column_list))},

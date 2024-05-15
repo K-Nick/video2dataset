@@ -19,14 +19,15 @@ def get_frame_size(height, width, size):
 
 class DecordSubsampler(Subsampler):
 
-    def __init__(self, num_frames=None, fps=None, frame_size=None, encode_format="mp4"):
+    def __init__(self, num_frames=None, fps=None, frame_size=None, center_crop=True, encode_format="mp4"):
         self.fps = fps
         self.num_frames = num_frames
 
         self.output_modality = "video"
         self.encode_formats = {"video": encode_format}
         if frame_size is not None:
-            self.transform = Compose([Resize(frame_size), CenterCrop(frame_size), ToStackedArray()])
+            maybe_centercrop = [CenterCrop(frame_size)] if center_crop else []
+            self.transform = Compose([Resize(frame_size)] + maybe_centercrop + [ToStackedArray()])
         else:
             self.transform = [ToStackedArray()]
 
@@ -54,7 +55,7 @@ class DecordSubsampler(Subsampler):
             frames = split_array(frames)
             frames = self.transform(frames)
 
-            subsampled_byte = array_to_video_bytes(frames, fps=max(fps,1.0))
+            subsampled_byte = array_to_video_bytes(frames, fps=max(fps, 1.0))
 
             # with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
             # imageio.mimsave(f.name, frames, format="mp4")

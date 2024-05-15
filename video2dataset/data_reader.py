@@ -4,6 +4,7 @@ import os
 import uuid
 import requests
 import yt_dlp
+from yt_dlp.utils import parse_duration
 import io
 import webvtt
 import ffmpeg
@@ -222,7 +223,10 @@ class YtDlpDownloader:
                 "no_warnings": True,
             }
             if timestamp is not None:
-                ydl_opts["download_sections"] = f"*{timestamp}"
+                st, ed = timestamp.split("-")
+
+                parse_timestamp = lambda x: float("inf") if x in ("inf", "infinite") else parse_duration(x)
+                ydl_opts["download_ranges"] = lambda _, __: [{"start_time": parse_timestamp(st), "end_time": parse_timestamp(ed)}]
 
             err = None
             try:

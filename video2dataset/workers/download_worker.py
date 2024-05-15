@@ -158,6 +158,9 @@ class DownloadWorker:
 
         loader = data_generator()
 
+        # self.data_reader(next(loader))
+        # import ipdb; ipdb.set_trace()
+
         # The subsamplers might change the output format, so we need to update the writer
         writer_encode_formats = self.encode_formats.copy()
         if self.subsamplers["audio"]:

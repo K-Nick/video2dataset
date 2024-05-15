@@ -72,6 +72,7 @@ def get_args():
     parser.add_argument("--tmp_dir", default="/tmp", help="Path to temporary directory on your file system")
     parser.add_argument("--config", default="default", help="Path to your config of choice or the config itself")
     parser.add_argument("--opts", nargs="+", help="Additional config options to override", default=[])
+    parser.add_argument("--delimiter", default=",", help="Delimiter for csv/tsv files")
 
     return parser.parse_args()
 
@@ -203,6 +204,7 @@ def video2dataset(local_args):
             done_shards,
             tmp_path,
             config["reading"]["sampler"],
+            delimiter=local_args.delimiter,
         )
 
     if stage == "download":
@@ -269,7 +271,6 @@ def video2dataset(local_args):
         distributor_fn = no_distributor
     else:
         raise ValueError(f"Distributor {config['distribution']['distributor']} not supported")
-    
 
     distributor_fn(
         config["distribution"]["processes_count"],

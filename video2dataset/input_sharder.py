@@ -37,6 +37,7 @@ class InputSharder:
         done_shards,
         tmp_path,
         sampler=lambda x: x,
+        delimiter=",",
     ) -> None:
         self.input_format = input_format
         self.url_col = url_col
@@ -46,6 +47,7 @@ class InputSharder:
         self.number_sample_per_shard = number_sample_per_shard
         self.done_shards = done_shards
         self.shard_sampler = sampler
+        self.delimiter = delimiter
 
         fs, url_path = fsspec.core.url_to_fs(url_list)
         self.fs = fs
@@ -62,9 +64,7 @@ class InputSharder:
             self.column_list = ["url"]
         elif self.input_format in ["json", "csv", "tsv", "tsv.gz", "parquet"]:
             self.column_list = self.save_additional_columns if self.save_additional_columns is not None else []
-            self.column_list = (
-                self.column_list + ["clips"] * bool(self.clip_col) + ["caption"] * bool(self.caption_col) + ["url"]
-            )
+            self.column_list = self.column_list + ["clips"] * bool(self.clip_col) + ["caption"] * bool(self.caption_col) + ["url"]
         else:
             raise ValueError(f"Invalid input format {self.input_format}")
 
@@ -77,7 +77,8 @@ class InputSharder:
                 elif self.input_format == "json":
                     df = pa.Table.from_pandas(pd.read_json(file))
                 elif self.input_format == "csv":
-                    df = pa.Table.from_pandas(pd.read_csv(file))
+                    # df = pa.Table.from_pandas(pd.read_csv(file))
+                    df = csv_pq.read_csv(file, parse_options=csv_pq.ParseOptions(delimiter=self.delimiter))
                 elif self.input_format == "tsv":
                     df = csv_pq.read_csv(file, parse_options=csv_pq.ParseOptions(delimiter="\t"))
                 else:
@@ -111,9 +112,7 @@ class InputSharder:
 
         number_shards = math.ceil(df.num_rows / self.number_sample_per_shard)
         shards_to_write = [
-            (start_shard_id + shard_id, shard_id)
-            for shard_id in range(number_shards)
-            if start_shard_id + shard_id not in self.done_shards
+            (start_shard_id + shard_id, shard_id) for shard_id in range(number_shards) if start_shard_id + shard_id not in self.done_shards
         ]
 
         shards_to_write = self.shard_sampler(shards_to_write)
@@ -143,6 +142,8 @@ class InputSharder:
                         raise e
             # can't reach here
             raise ValueError("Failed to write to file.")
+        
+        write_shard(shards_to_write[0])
 
         for i in range(10):
             shards = []

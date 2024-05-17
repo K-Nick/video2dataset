@@ -134,10 +134,8 @@ class DownloadWorker:
         )
 
         pydict = df.select(self.column_list).to_pydict()
-        if self.key_col is None:
-            shard_to_dl = list(enumerate(zip(*(pydict[col] for col in self.column_list))))
-        else:
-            shard_to_dl = list(zip(pydict[self.key_col], *(pydict[col] for col in self.column_list)))
+        shard_to_dl = list(enumerate(zip(*(pydict[col] for col in self.column_list))))
+
         del pydict
         del df
 
@@ -184,6 +182,11 @@ class DownloadWorker:
         )
         oom_sample_per_shard = math.ceil(math.log10(self.config["storage"]["number_sample_per_shard"]))
 
+        # calculate column index of key_col, preventing calculating it multiple times
+        key_col_index = None
+        if self.key_col is not None:
+            key_col_index = self.column_list.index(self.key_col)
+
         with ThreadPool(self.config["distribution"]["thread_count"]) as thread_pool:
             for key, streams, yt_meta_dict, error_message in thread_pool.imap_unordered(
                 self.data_reader,  # pylint: disable=(unnecessary-lambda)
@@ -195,8 +198,8 @@ class DownloadWorker:
                     if self.key_col is None:
                         str_key = compute_key(key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"])
                     else:
-                        str_key = str(key)
-                        
+                        str_key = sample_data[key_col_index]
+
                     meta = {
                         **{self.column_list[i]: sample_data[i] for i in range(len(self.column_list))},
                         "key": str_key,

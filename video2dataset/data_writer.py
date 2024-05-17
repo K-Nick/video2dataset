@@ -128,6 +128,7 @@ class WebDatasetSampleWriter:
     def write(self, streams, key, caption, meta):
         """write sample to tars"""
         sample = {"__key__": key}
+        meta["__key__"] = key
         for modality, stream in streams.items():
             ext = self.encode_formats[modality] if modality in self.encode_formats else modality
             sample[ext] = stream

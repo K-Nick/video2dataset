@@ -128,7 +128,7 @@ class DownloadWorker:
             df = pa.ipc.open_file(f).read_all()
         schema = df.schema
         schema = (
-            schema.append(pa.field("key", pa.string()))
+            schema.append(pa.field("__key__", pa.string()))
             .append(pa.field("status", pa.string()))
             .append(pa.field("error_message", pa.string()))
         )

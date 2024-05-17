@@ -82,7 +82,7 @@ class ParquetSampleWriter:
 
     def write(self, streams, key, caption, meta):
         """Keep sample in memory then write to disk when close() is called"""
-        sample = {"key": key}
+        sample = {"__key__": key}
         for modality, stream in streams.items():
             ext = self.encode_formats[modality] if modality in self.encode_formats else modality
             sample[ext] = stream

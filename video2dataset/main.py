@@ -73,6 +73,7 @@ def get_args():
     parser.add_argument("--config", default="default", help="Path to your config of choice or the config itself")
     parser.add_argument("--opts", nargs="+", help="Additional config options to override", default=[])
     parser.add_argument("--delimiter", default=",", help="Delimiter for csv/tsv files")
+    parser.add_argument("--key_col", default=None, help="Column in input containing the key for the sample")
 
     return parser.parse_args()
 
@@ -216,6 +217,7 @@ def video2dataset(local_args):
             tmp_dir=tmp_dir,
             encode_formats=encode_formats,
             config=config,
+            key_col=local_args.key_col,
         )
     elif stage == "subset":
         worker = SubsetWorker(  # type: ignore

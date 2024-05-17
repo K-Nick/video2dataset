@@ -46,6 +46,7 @@ class DownloadWorker:
         tmp_dir,
         encode_formats,
         config,
+        key_col=None,
     ) -> None:
         self.sample_writer_class = sample_writer_class
         self.save_caption = save_caption
@@ -132,7 +133,10 @@ class DownloadWorker:
         )
 
         pydict = df.select(self.column_list).to_pydict()
-        shard_to_dl = list(enumerate(zip(*(pydict[col] for col in self.column_list))))
+        if self.key_col is None:
+            shard_to_dl = list(enumerate(zip(*(pydict[col] for col in self.column_list))))
+        else:
+            shard_to_dl = list(zip(pydict[self.key_col], *(pydict[col] for col in self.column_list)))
         del pydict
         del df
 

@@ -99,6 +99,7 @@ class DownloadWorker:
             audio_subsamplers.append(AudioRateSubsampler(**self.config["subsampling"]["AudioRateSubsampler"]["args"]))
 
         self.subsamplers = {"video": video_subsamplers, "audio": audio_subsamplers}
+        self.key_col = key_col
 
     def __call__(
         self,
@@ -191,7 +192,11 @@ class DownloadWorker:
                 try:
                     _, sample_data = shard_to_dl[key]
 
-                    str_key = compute_key(key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"])
+                    if self.key_col is None:
+                        str_key = compute_key(key, shard_id, oom_sample_per_shard, self.config["storage"]["oom_shard_count"])
+                    else:
+                        str_key = str(key)
+                        
                     meta = {
                         **{self.column_list[i]: sample_data[i] for i in range(len(self.column_list))},
                         "key": str_key,
